@@ -1,0 +1,16 @@
+# Рабочие данные — не публиковать
+stim_bonus_data_v5.json
+stim_bonus_hidden_v1.json
+*.bak
+*.backup
+
+# Сборочные/временные файлы
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec
+
+# Локальные Windows-файлы
+Thumbs.db
+Desktop.ini
