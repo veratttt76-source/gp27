@@ -14,3 +14,7 @@ dist/
 # Локальные Windows-файлы
 Thumbs.db
 Desktop.ini
+
+# Локальные экспорты
+gp27_export.xlsx
+gp27_*.xlsx
