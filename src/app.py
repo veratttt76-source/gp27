@@ -5,6 +5,7 @@ from functools import wraps
 from pathlib import Path
 from uuid import uuid4
 from flask import Flask, flash, redirect, render_template, request, send_file, session, url_for
+from tempfile import NamedTemporaryFile
 from openpyxl import Workbook
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -83,7 +84,8 @@ def new_eval():
     d=load_data()
     if request.method=="POST":
         pos=next(x for x in d["positions"] if x["id"]==request.form["position_id"])
-        e={"id":uuid4().hex,"month":request.form["month"],"department_id":request.form["department_id"],"employee_name":request.form["employee_name"].strip(),"position_id":request.form["position_id"],"employment_type":request.form["employment_type"],"planned_hours":float(request.form["planned_hours"] or 0),"actual_hours":float(request.form["actual_hours"] or 0),"scores":{c["id"]:int(request.form.get("score_"+c["id"],0)) for c in pos["criteria"]},"status":"draft","return_comment":"","point_price":None}
+        dep_id=session.get("department_id") if session["role"]=="manager" else request.form["department_id"]
+        e={"id":uuid4().hex,"month":request.form["month"],"department_id":dep_id,"employee_name":request.form["employee_name"].strip(),"position_id":request.form["position_id"],"employment_type":request.form["employment_type"],"planned_hours":float(request.form["planned_hours"] or 0),"actual_hours":float(request.form["actual_hours"] or 0),"scores":{c["id"]:int(request.form.get("score_"+c["id"],0)) for c in pos["criteria"]},"status":"draft","return_comment":"","point_price":None}
         d["evaluations"].append(e); save_data(d); return redirect(url_for("edit_eval",eid=e["id"]))
     return render_template("evaluation.html",e=None,raw=None,data=d,month=request.args.get("month") or month_now(),is_hidden=False)
 
@@ -102,12 +104,14 @@ def edit_eval(eid):
         if a=="return" and session["role"] in ("accountant","admin"): e["status"]="returned"; e["return_comment"]=request.form.get("return_comment","").strip()
         elif a=="approve" and session["role"] in ("accountant","admin"): e["status"]="approved"
         elif a=="submit" and session["role"] in ("manager","admin"): e["status"]="submitted"
-        for k in ("employee_name","employment_type","position_id"):
-            if k in request.form: e[k]=request.form[k]
-        for k in ("planned_hours","actual_hours"):
-            if k in request.form: e[k]=float(request.form[k] or 0)
+        can_edit_form = session["role"] in ("accountant","admin") or e.get("status") in ("draft","returned")
+        if can_edit_form:
+            for k in ("employee_name","employment_type","position_id"):
+                if k in request.form: e[k]=request.form[k]
+            for k in ("planned_hours","actual_hours"):
+                if k in request.form: e[k]=float(request.form[k] or 0)
         pos=next((x for x in d["positions"] if x["id"]==e["position_id"]),None)
-        if pos: e["scores"]={c["id"]:int(request.form.get("score_"+c["id"],e.get("scores",{}).get(c["id"],0))) for c in pos["criteria"]}
+        if pos and can_edit_form: e["scores"]={c["id"]:int(request.form.get("score_"+c["id"],e.get("scores",{}).get(c["id"],0))) for c in pos["criteria"]}
         if session["role"] in ("accountant","admin") and "point_price" in request.form: e["point_price"]=float(request.form["point_price"] or 0)
         save_data(d); flash("Сохранено")
     return render_template("evaluation.html",e=enrich(e,d),raw=e,data=d,month=e["month"],is_hidden=eid in hidden_ids())
@@ -134,7 +138,7 @@ def accounting_bulk():
 def xlsx(rows,title):
     wb=Workbook(); ws=wb.active; ws.title="Ведомость"; ws.append([title]); ws.append(["ФИО","Должность","План","Факт","Баллы","Расчётный балл","Цена балла","Выплата"])
     for r in rows: ws.append([r["employee_name"],r["position"],r["planned_hours"],r["actual_hours"],r["total_points"],r["normalized_points"],r.get("point_price"),r.get("bonus_amount")])
-    p=BASE/"gp27_export.xlsx"; wb.save(p); return send_file(p,as_attachment=True,download_name="gp27.xlsx")
+    tmp=NamedTemporaryFile(prefix="gp27_",suffix=".xlsx",delete=False); tmp.close(); wb.save(tmp.name); return send_file(tmp.name,as_attachment=True,download_name="gp27.xlsx")
 @app.route("/export/manager.xlsx")
 @auth
 def export_manager_xlsx():
@@ -153,4 +157,33 @@ def print_manager():
 @roles("accountant","admin")
 def print_accounting():
     d=load_data(); m=request.args.get("month") or month_now(); return render_template("print_accounting.html",rows=report_rows(d,m,request.args.get("department_id") or None),month=m)
+@app.route("/admin",methods=["GET","POST"])
+@auth
+@roles("admin")
+def admin_panel():
+    d=load_data()
+    if request.method=="POST":
+        action=request.form.get("action")
+        if action=="add_department":
+            name=request.form.get("name","").strip()
+            if name: d["departments"].append({"id":"dep-"+uuid4().hex[:8],"name":name})
+        elif action=="add_position":
+            name=request.form.get("name","").strip()
+            if name: d["positions"].append({"id":"pos-"+uuid4().hex[:8],"name":name,"criteria":[]})
+        elif action=="add_criterion":
+            p=next((x for x in d["positions"] if x["id"]==request.form.get("position_id")),None); name=request.form.get("name","").strip()
+            if p and name: p["criteria"].append({"id":"c-"+uuid4().hex[:8],"name":name,"points":2})
+        elif action=="delete_criterion":
+            p=next((x for x in d["positions"] if x["id"]==request.form.get("position_id")),None)
+            if p: p["criteria"]=[x for x in p["criteria"] if x["id"]!=request.form.get("criterion_id")]
+        elif action=="add_user":
+            login=request.form.get("login","").strip(); password=request.form.get("password",""); role=request.form.get("role")
+            if login and password and role in ("manager","accountant","admin") and not any(x["login"]==login for x in d["users"]):
+                d["users"].append({"login":login,"password_hash":generate_password_hash(password),"role":role,"department_id":request.form.get("department_id") or None})
+        elif action=="reset_password":
+            u=next((x for x in d["users"] if x["login"]==request.form.get("login")),None); password=request.form.get("password","")
+            if u and password: u["password_hash"]=generate_password_hash(password)
+        save_data(d); flash("Настройки сохранены"); return redirect(url_for("admin_panel"))
+    return render_template("admin.html",data=d)
+
 if __name__=="__main__": app.run(host="127.0.0.1",port=5000,debug=False)
