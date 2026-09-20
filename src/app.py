@@ -56,7 +56,7 @@ def visible(d,m=None,dep=None,admin_can_see_hidden=True):
     return out
 def report_rows(d,m,dep=None):
     h=hidden_ids()
-    return [r for r in visible(d,m,dep,False) if r["id"] not in h]
+    return [r for r in visible(d,m,dep,False) if r["id"] not in h and r.get("status")=="approved"]
 
 @app.route("/login",methods=["GET","POST"])
 def login():
@@ -102,9 +102,9 @@ def edit_eval(eid):
             d["evaluations"]=[x for x in d["evaluations"] if x["id"]!=eid]; save_data(d); h=hidden_ids(); h.discard(eid); save_hidden(h); return redirect(url_for("dashboard"))
         if a=="hide" and session["role"]=="admin":
             h=hidden_ids(); h.remove(eid) if eid in h else h.add(eid); save_hidden(h); return redirect(url_for("edit_eval",eid=eid))
-        if a=="return" and session["role"] in ("accountant","admin"): e["status"]="returned"; e["return_comment"]=request.form.get("return_comment","").strip()
-        elif a=="approve" and session["role"] in ("accountant","admin"): e["status"]="approved"
-        elif a=="submit" and session["role"] in ("manager","admin"): e["status"]="submitted"
+        if a=="return" and session["role"] in ("accountant","admin") and e.get("status")=="submitted": e["status"]="returned"; e["return_comment"]=request.form.get("return_comment","").strip()
+        elif a=="approve" and session["role"] in ("accountant","admin") and e.get("status")=="submitted": e["status"]="approved"; e["return_comment"]=""
+        elif a=="submit" and session["role"] in ("manager","admin") and e.get("status") in ("draft","returned"): e["status"]="submitted"; e["return_comment"]=""
         if can_edit_form:
             for k in ("employee_name","employment_type","position_id"):
                 if k in request.form: e[k]=request.form[k]
