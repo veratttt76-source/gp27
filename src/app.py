@@ -127,13 +127,21 @@ def accounting():
 @roles("accountant","admin")
 def accounting_bulk():
     d=load_data()
+    selected_month=request.form.get("month")
+    selected_dep=request.form.get("department_id") or None
+    hidden=hidden_ids()
+    selected_ids={key[6:] for key in request.form if key.startswith("price_")}
     for e in d["evaluations"]:
+        if e["id"] not in selected_ids: continue
+        if e["id"] in hidden: continue
+        if selected_month and e.get("month")!=selected_month: continue
+        if selected_dep and str(e.get("department_id"))!=str(selected_dep): continue
         k="price_"+e["id"]
-        if k in request.form:
-            try: e["point_price"]=float(request.form[k].replace(",","."))
-            except ValueError: pass
-            if e["status"]=="submitted": e["status"]="approved"
-    save_data(d); return redirect(url_for("accounting",month=request.form.get("month"),department_id=request.form.get("department_id")))
+        try: e["point_price"]=float(request.form[k].replace(",","."))
+        except (ValueError,AttributeError): continue
+        if e["status"]=="submitted": e["status"]="approved"
+    save_data(d)
+    return redirect(url_for("accounting",month=selected_month,department_id=selected_dep))
 
 def xlsx(rows,title):
     wb=Workbook(); ws=wb.active; ws.title="Ведомость"; ws.append([title]); ws.append(["ФИО","Должность","План","Факт","Баллы","Расчётный балл","Цена балла","Выплата"])
