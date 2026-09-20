@@ -1,0 +1,60 @@
+name: Build Windows EXE
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - ".github/workflows/build-windows.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: src
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+      - name: Build GP27.exe
+        run: >
+          pyinstaller --noconfirm --clean --onefile --name GP27
+          --add-data "templates;templates"
+          --add-data "static;static"
+          app.py
+      - name: Prepare package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force package | Out-Null
+          Copy-Item dist/GP27.exe package/GP27.exe
+          @"
+          GP27 — Windows
+
+          1. Распакуйте ZIP в отдельную папку.
+          2. Запустите GP27.exe.
+          3. Разрешите доступ в Windows Firewall, если Windows спросит.
+          4. Откройте http://127.0.0.1:5000
+          5. При первом запуске локальные файлы данных создадутся рядом с GP27.exe.
+          6. После проверки смените тестовые пароли через Администрирование.
+
+          Python устанавливать не требуется.
+          "@ | Set-Content -Encoding UTF8 package/ИНСТРУКЦИЯ.txt
+          Compress-Archive -Path package/* -DestinationPath GP27_Windows.zip -Force
+      - name: Publish latest ZIP
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: windows-latest
+          name: GP27 Windows
+          prerelease: false
+          make_latest: true
+          files: src/GP27_Windows.zip
