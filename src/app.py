@@ -170,18 +170,7 @@ def print_accounting():
 @app.route("/download/windows")
 @auth
 def download_windows():
-    include=["app.py","requirements.txt","start_windows.bat","templates/base.html","templates/login.html","templates/dashboard.html","templates/evaluation.html","templates/accounting.html","templates/print_manager.html","templates/print_accounting.html","templates/admin.html","static/style.css","static/print.css"]
-    instructions="GP27 Windows\n\n1. Install Python 3.11+ and enable Add Python to PATH.\n2. Extract this ZIP.\n3. Run START_GP27.bat.\n4. Open http://127.0.0.1:5000 in a browser.\n\nWorking data files are not included and are created locally.\nBefore real use, change the initial test passwords in Administration.\n"
-    starter="@echo off\nchcp 65001 >nul\ncd /d %~dp0\npython -m pip install -r requirements.txt\nif errorlevel 1 pause & exit /b 1\npython app.py\npause\n"
-    buf=io.BytesIO()
-    with zipfile.ZipFile(buf,"w",zipfile.ZIP_DEFLATED) as z:
-        for rel in include:
-            p=BASE/rel
-            if p.exists() and rel!="start_windows.bat": z.write(p,"GP27/"+rel)
-        z.writestr("GP27/START_GP27.bat",starter)
-        z.writestr("GP27/README_WINDOWS.txt",instructions)
-    buf.seek(0)
-    return send_file(buf,mimetype="application/zip",as_attachment=True,download_name="GP27_Windows.zip")
+    return redirect("https://github.com/veratttt76-source/gp27/releases/download/windows-latest/GP27_Windows.zip")
 
 @app.route("/admin",methods=["GET","POST"])
 @auth
