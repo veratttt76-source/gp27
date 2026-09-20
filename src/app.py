@@ -3,16 +3,18 @@ import json, os, io, zipfile
 from datetime import datetime
 from functools import wraps
 from pathlib import Path
+import sys
 from uuid import uuid4
 from flask import Flask, flash, redirect, render_template, request, send_file, session, url_for
 from tempfile import NamedTemporaryFile
 from openpyxl import Workbook
 from werkzeug.security import check_password_hash, generate_password_hash
 
-BASE=Path(__file__).resolve().parent
+BASE=Path(getattr(sys,"_MEIPASS",Path(__file__).resolve().parent))
+DATA_DIR=Path(sys.executable).resolve().parent if getattr(sys,"frozen",False) else Path(__file__).resolve().parent
 DATA=BASE/"stim_bonus_data_v5.json"
 HIDDEN=BASE/"stim_bonus_hidden_v1.json"
-app=Flask(__name__); app.secret_key=os.environ.get("GP27_SECRET_KEY","gp27-local-change-me")
+app=Flask(__name__,template_folder=str(BASE/"templates"),static_folder=str(BASE/"static")); app.secret_key=os.environ.get("GP27_SECRET_KEY","gp27-local-change-me")
 DEFAULT={"users":[{"login":"admin","password_hash":generate_password_hash("admin"),"role":"admin","department_id":None},{"login":"manager","password_hash":generate_password_hash("manager"),"role":"manager","department_id":"dep-1"},{"login":"accountant","password_hash":generate_password_hash("accountant"),"role":"accountant","department_id":None}],"departments":[{"id":"dep-1","name":"Подразделение 1"}],"positions":[{"id":"pos-1","name":"Должность 1","criteria":[{"id":"c1","name":"Критерий 1","points":2}]}],"evaluations":[]}
 
 def load_data():
