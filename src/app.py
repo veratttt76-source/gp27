@@ -97,6 +97,7 @@ def edit_eval(eid):
     if session["role"]=="manager" and str(e["department_id"])!=str(session.get("department_id")): return "Нет доступа",403
     if request.method=="POST":
         a=request.form.get("action","save")
+        can_edit_form = session["role"] in ("accountant","admin") or e.get("status") in ("draft","returned")
         if a=="delete" and session["role"]=="admin":
             d["evaluations"]=[x for x in d["evaluations"] if x["id"]!=eid]; save_data(d); h=hidden_ids(); h.discard(eid); save_hidden(h); return redirect(url_for("dashboard"))
         if a=="hide" and session["role"]=="admin":
@@ -104,7 +105,6 @@ def edit_eval(eid):
         if a=="return" and session["role"] in ("accountant","admin"): e["status"]="returned"; e["return_comment"]=request.form.get("return_comment","").strip()
         elif a=="approve" and session["role"] in ("accountant","admin"): e["status"]="approved"
         elif a=="submit" and session["role"] in ("manager","admin"): e["status"]="submitted"
-        can_edit_form = session["role"] in ("accountant","admin") or e.get("status") in ("draft","returned")
         if can_edit_form:
             for k in ("employee_name","employment_type","position_id"):
                 if k in request.form: e[k]=request.form[k]
@@ -173,6 +173,12 @@ def admin_panel():
         elif action=="add_criterion":
             p=next((x for x in d["positions"] if x["id"]==request.form.get("position_id")),None); name=request.form.get("name","").strip()
             if p and name: p["criteria"].append({"id":"c-"+uuid4().hex[:8],"name":name,"points":2})
+        elif action=="edit_criterion":
+            p=next((x for x in d["positions"] if x["id"]==request.form.get("position_id")),None); criterion=next((x for x in p["criteria"] if x["id"]==request.form.get("criterion_id")),None) if p else None
+            if criterion:
+                criterion["name"]=request.form.get("name",criterion["name"]).strip() or criterion["name"]
+                try: criterion["points"]=float(request.form.get("points",criterion.get("points",2)))
+                except ValueError: pass
         elif action=="delete_criterion":
             p=next((x for x in d["positions"] if x["id"]==request.form.get("position_id")),None)
             if p: p["criteria"]=[x for x in p["criteria"] if x["id"]!=request.form.get("criterion_id")]
