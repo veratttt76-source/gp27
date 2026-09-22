@@ -27,7 +27,8 @@ jobs:
           }
           [IO.File]::WriteAllBytes("strict_source.zip", [Convert]::FromBase64String($b64))
           Expand-Archive -Path strict_source.zip -DestinationPath strict_source -Force
-          Copy-Item -Path "strict_source\*" -Destination "." -Recurse -Force
+          if (Test-Path "src") { Remove-Item "src" -Recurse -Force }
+          Copy-Item -Path "strict_source\src" -Destination "." -Recurse -Force
           if (-not (Test-Path "src\app.py")) { throw "src/app.py not restored" }
           if (-not (Test-Path "src\test_smoke.py")) { throw "src/test_smoke.py not restored" }
           if (-not (Test-Path "src\seed_data.json.gz.b64")) { throw "seed data not restored" }
