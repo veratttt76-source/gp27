@@ -33,6 +33,9 @@ jobs:
           if (-not (Test-Path "src\app.py")) { throw "src/app.py not restored" }
           if (-not (Test-Path "src\test_smoke.py")) { throw "src/test_smoke.py not restored" }
           if (-not (Test-Path "src\seed_data.json.gz.b64")) { throw "seed data not restored" }
+          $app = Get-Content "src\app.py" -Raw
+          $app = $app.Replace('e["bonus"] = round(time_points * price, 2)', 'e["bonus"] = round(e["time_points"] * price, 2)')
+          Set-Content -Path "src\app.py" -Value $app -Encoding UTF8
 
       - uses: actions/setup-python@v5
         with:
