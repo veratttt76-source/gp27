@@ -1,11 +1,11 @@
-name: Build Windows EXE
+name: Build GP27 Strict Windows
 
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [strict-tz-v6-20260922]
     paths:
-      - "src/**"
+      - "gp27_payload.part*"
       - ".github/workflows/build-windows.yml"
 
 permissions:
@@ -14,47 +14,78 @@ permissions:
 jobs:
   build-windows:
     runs-on: windows-latest
-    defaults:
-      run:
-        working-directory: src
     steps:
       - uses: actions/checkout@v4
+
+      - name: Restore strict v6 source
+        shell: pwsh
+        run: |
+          $b64 = ""
+          1..10 | ForEach-Object {
+            $name = "gp27_payload.part{0:D2}" -f $_
+            $b64 += (Get-Content $name -Raw).Trim()
+          }
+          [IO.File]::WriteAllBytes("strict_source.zip", [Convert]::FromBase64String($b64))
+          Expand-Archive -Path strict_source.zip -DestinationPath strict_source -Force
+          Copy-Item -Path "strict_source\*" -Destination "." -Recurse -Force
+          if (-not (Test-Path "src\app.py")) { throw "src/app.py not restored" }
+          if (-not (Test-Path "src\test_smoke.py")) { throw "src/test_smoke.py not restored" }
+          if (-not (Test-Path "src\seed_data.json.gz.b64")) { throw "seed data not restored" }
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
       - name: Install dependencies
+        working-directory: src
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt pyinstaller
+
+      - name: Smoke tests
+        working-directory: src
+        run: python test_smoke.py
+
       - name: Build GP27.exe
+        working-directory: src
         run: >
           pyinstaller --noconfirm --clean --onefile --name GP27
           --add-data "templates;templates"
           --add-data "static;static"
+          --add-data "seed_data.json.gz.b64;."
           app.py
-      - name: Prepare package
+
+      - name: Prepare Windows ZIP
+        working-directory: src
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force package | Out-Null
           Copy-Item dist/GP27.exe package/GP27.exe
           @"
-          GP27 — Windows
+          GP27 StimBonus v6 STRICT TZ — Windows
 
           1. Распакуйте ZIP в отдельную папку.
           2. Запустите GP27.exe.
-          3. Разрешите доступ в Windows Firewall, если Windows спросит.
-          4. Откройте http://127.0.0.1:5000
-          5. При первом запуске локальные файлы данных создадутся рядом с GP27.exe.
-          6. После проверки смените тестовые пароли через Администрирование.
-
-          Python устанавливать не требуется.
+          3. Если Windows Firewall запросит разрешение — разрешите для частной сети.
+          4. В браузере откройте http://127.0.0.1:5000
+          5. Python устанавливать не требуется.
+          6. Рабочие данные создаются локально рядом с программой.
+          7. После первого входа смените тестовые пароли через Администрирование.
           "@ | Set-Content -Encoding UTF8 package/ИНСТРУКЦИЯ.txt
-          Compress-Archive -Path package/* -DestinationPath GP27_Windows.zip -Force
-      - name: Publish latest ZIP
+          Compress-Archive -Path package/* -DestinationPath GP27_StimBonus_v6_STRICT_TZ_Windows.zip -Force
+
+      - name: Upload Windows ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GP27_StimBonus_v6_STRICT_TZ_Windows
+          path: src/GP27_StimBonus_v6_STRICT_TZ_Windows.zip
+          if-no-files-found: error
+
+      - name: Publish Windows ZIP
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: windows-latest
-          name: GP27 Windows
+          tag_name: windows-v6-strict
+          name: GP27 StimBonus v6 STRICT TZ Windows
           prerelease: false
-          make_latest: true
-          files: src/GP27_Windows.zip
+          make_latest: false
+          files: src/GP27_StimBonus_v6_STRICT_TZ_Windows.zip
