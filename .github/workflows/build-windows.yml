@@ -35,20 +35,215 @@ jobs:
           if (-not (Test-Path "src\seed_data.json.gz.b64")) { throw "seed data not restored" }
           $app = Get-Content "src\app.py" -Raw
           $app = $app.Replace('e["bonus"] = round(time_points * price, 2)', 'e["bonus"] = round(e["time_points"] * price, 2)')
+          Set-Content -Path "src\app.py" -Value $app -Encoding UTF8
           $lines = Get-Content "src\app.py"
           $out = New-Object System.Collections.Generic.List[string]
           foreach ($line in $lines) {
-            if ($line -match '^            missing = validate_required_answers\(d, e, include_special=False\)$') { continue }
-            if ($line -match '^            if missing:$') { continue }
+            if ($line -match '^            missing = validate_required_answers\(d, e, include_special=False\)
+          $test = Get-Content "src\test_smoke.py" -Raw
+          $oldLine = "        rows = gp.report_rows(d, '2026-09')"
+          $newLine = "        with gp.app.test_request_context('/'):" + [Environment]::NewLine + "            gp.session['role'] = 'admin'" + [Environment]::NewLine + "            rows = gp.report_rows(d, '2026-09')"
+          if (-not $test.Contains($oldLine)) { throw "smoke context line not found" }
+          Set-Content -Path "src\test_smoke.py" -Value ($test.Replace($oldLine, $newLine)) -Encoding UTF8
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        working-directory: src
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Smoke tests
+        working-directory: src
+        run: python test_smoke.py
+
+      - name: Build GP27.exe
+        working-directory: src
+        run: >
+          pyinstaller --noconfirm --clean --onefile --name GP27
+          --add-data "templates;templates"
+          --add-data "static;static"
+          --add-data "seed_data.json.gz.b64;."
+          app.py
+
+      - name: Prepare Windows ZIP
+        working-directory: src
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force package | Out-Null
+          Copy-Item dist/GP27.exe package/GP27.exe
+          @"
+          GP27 StimBonus v6 STRICT TZ — Windows
+
+          1. Распакуйте ZIP в отдельную папку.
+          2. Запустите GP27.exe.
+          3. Если Windows Firewall запросит разрешение — разрешите для частной сети.
+          4. В браузере откройте http://127.0.0.1:5000
+          5. Python устанавливать не требуется.
+          6. Рабочие данные создаются локально рядом с программой.
+          7. После первого входа смените тестовые пароли через Администрирование.
+          "@ | Set-Content -Encoding UTF8 package/ИНСТРУКЦИЯ.txt
+          Compress-Archive -Path package/* -DestinationPath GP27_StimBonus_v6_STRICT_TZ_Windows.zip -Force
+
+      - name: Upload Windows ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GP27_StimBonus_v6_STRICT_TZ_Windows
+          path: src/GP27_StimBonus_v6_STRICT_TZ_Windows.zip
+          if-no-files-found: error
+
+      - name: Publish Windows ZIP
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: windows-v6-strict
+          name: GP27 StimBonus v6 STRICT TZ Windows
+          prerelease: false
+          make_latest: false
+          files: src/GP27_StimBonus_v6_STRICT_TZ_Windows.zip
+) { continue }
+            if ($line -match '^            if missing:
+          $test = Get-Content "src\test_smoke.py" -Raw
+          $oldLine = "        rows = gp.report_rows(d, '2026-09')"
+          $newLine = "        with gp.app.test_request_context('/'):" + [Environment]::NewLine + "            gp.session['role'] = 'admin'" + [Environment]::NewLine + "            rows = gp.report_rows(d, '2026-09')"
+          if (-not $test.Contains($oldLine)) { throw "smoke context line not found" }
+          Set-Content -Path "src\test_smoke.py" -Value ($test.Replace($oldLine, $newLine)) -Encoding UTF8
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        working-directory: src
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Smoke tests
+        working-directory: src
+        run: python test_smoke.py
+
+      - name: Build GP27.exe
+        working-directory: src
+        run: >
+          pyinstaller --noconfirm --clean --onefile --name GP27
+          --add-data "templates;templates"
+          --add-data "static;static"
+          --add-data "seed_data.json.gz.b64;."
+          app.py
+
+      - name: Prepare Windows ZIP
+        working-directory: src
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force package | Out-Null
+          Copy-Item dist/GP27.exe package/GP27.exe
+          @"
+          GP27 StimBonus v6 STRICT TZ — Windows
+
+          1. Распакуйте ZIP в отдельную папку.
+          2. Запустите GP27.exe.
+          3. Если Windows Firewall запросит разрешение — разрешите для частной сети.
+          4. В браузере откройте http://127.0.0.1:5000
+          5. Python устанавливать не требуется.
+          6. Рабочие данные создаются локально рядом с программой.
+          7. После первого входа смените тестовые пароли через Администрирование.
+          "@ | Set-Content -Encoding UTF8 package/ИНСТРУКЦИЯ.txt
+          Compress-Archive -Path package/* -DestinationPath GP27_StimBonus_v6_STRICT_TZ_Windows.zip -Force
+
+      - name: Upload Windows ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GP27_StimBonus_v6_STRICT_TZ_Windows
+          path: src/GP27_StimBonus_v6_STRICT_TZ_Windows.zip
+          if-no-files-found: error
+
+      - name: Publish Windows ZIP
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: windows-v6-strict
+          name: GP27 StimBonus v6 STRICT TZ Windows
+          prerelease: false
+          make_latest: false
+          files: src/GP27_StimBonus_v6_STRICT_TZ_Windows.zip
+) { continue }
             if ($line -match '^                flash\(f"Нельзя отправить: не заполнены основные критерии') { continue }
-            if ($line -match '^            elif not e\.get\("employee"\) or not e\.get\("plan"\):$') {
+            if ($line -match '^            elif not e\.get\("employee"\) or not e\.get\("plan"\):
+          $test = Get-Content "src\test_smoke.py" -Raw
+          $oldLine = "        rows = gp.report_rows(d, '2026-09')"
+          $newLine = "        with gp.app.test_request_context('/'):" + [Environment]::NewLine + "            gp.session['role'] = 'admin'" + [Environment]::NewLine + "            rows = gp.report_rows(d, '2026-09')"
+          if (-not $test.Contains($oldLine)) { throw "smoke context line not found" }
+          Set-Content -Path "src\test_smoke.py" -Value ($test.Replace($oldLine, $newLine)) -Encoding UTF8
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        working-directory: src
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Smoke tests
+        working-directory: src
+        run: python test_smoke.py
+
+      - name: Build GP27.exe
+        working-directory: src
+        run: >
+          pyinstaller --noconfirm --clean --onefile --name GP27
+          --add-data "templates;templates"
+          --add-data "static;static"
+          --add-data "seed_data.json.gz.b64;."
+          app.py
+
+      - name: Prepare Windows ZIP
+        working-directory: src
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force package | Out-Null
+          Copy-Item dist/GP27.exe package/GP27.exe
+          @"
+          GP27 StimBonus v6 STRICT TZ — Windows
+
+          1. Распакуйте ZIP в отдельную папку.
+          2. Запустите GP27.exe.
+          3. Если Windows Firewall запросит разрешение — разрешите для частной сети.
+          4. В браузере откройте http://127.0.0.1:5000
+          5. Python устанавливать не требуется.
+          6. Рабочие данные создаются локально рядом с программой.
+          7. После первого входа смените тестовые пароли через Администрирование.
+          "@ | Set-Content -Encoding UTF8 package/ИНСТРУКЦИЯ.txt
+          Compress-Archive -Path package/* -DestinationPath GP27_StimBonus_v6_STRICT_TZ_Windows.zip -Force
+
+      - name: Upload Windows ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GP27_StimBonus_v6_STRICT_TZ_Windows
+          path: src/GP27_StimBonus_v6_STRICT_TZ_Windows.zip
+          if-no-files-found: error
+
+      - name: Publish Windows ZIP
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: windows-v6-strict
+          name: GP27 StimBonus v6 STRICT TZ Windows
+          prerelease: false
+          make_latest: false
+          files: src/GP27_StimBonus_v6_STRICT_TZ_Windows.zip
+) {
               $out.Add('            if not e.get("employee") or not e.get("plan"):')
               continue
             }
             $out.Add($line)
           }
           Set-Content -Path "src\app.py" -Value $out -Encoding UTF8
-          Set-Content -Path "src\app.py" -Value $app -Encoding UTF8
+          if (Select-String -Path "src\app.py" -SimpleMatch 'Нельзя отправить: не заполнены основные критерии' -Quiet) {
+            throw "regular criteria submit restriction still present"
+          }
           $test = Get-Content "src\test_smoke.py" -Raw
           $oldLine = "        rows = gp.report_rows(d, '2026-09')"
           $newLine = "        with gp.app.test_request_context('/'):" + [Environment]::NewLine + "            gp.session['role'] = 'admin'" + [Environment]::NewLine + "            rows = gp.report_rows(d, '2026-09')"
