@@ -35,6 +35,19 @@ jobs:
           if (-not (Test-Path "src\seed_data.json.gz.b64")) { throw "seed data not restored" }
           $app = Get-Content "src\app.py" -Raw
           $app = $app.Replace('e["bonus"] = round(time_points * price, 2)', 'e["bonus"] = round(e["time_points"] * price, 2)')
+          $oldSubmit = @'
+        if action == "submit" and role in ("manager", "admin") and e.get("status") in ("draft", "returned"):
+            missing = validate_required_answers(d, e, include_special=False)
+            if missing:
+                flash(f"Нельзя отправить: не заполнены основные критерии ({len(missing)}).", "error")
+            elif not e.get("employee") or not e.get("plan"):
+'@
+          $newSubmit = @'
+        if action == "submit" and role in ("manager", "admin") and e.get("status") in ("draft", "returned"):
+            if not e.get("employee") or not e.get("plan"):
+'@
+          if (-not $app.Contains($oldSubmit)) { throw "submit validation patch target not found" }
+          $app = $app.Replace($oldSubmit, $newSubmit)
           Set-Content -Path "src\app.py" -Value $app -Encoding UTF8
           $test = Get-Content "src\test_smoke.py" -Raw
           $oldLine = "        rows = gp.report_rows(d, '2026-09')"
