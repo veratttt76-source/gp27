@@ -7,6 +7,7 @@ on:
     paths:
       - "gp27_payload.part*"
       - ".github/workflows/build-windows.yml"
+      - "patch_appendix25.py"
 
 permissions:
   contents: write
@@ -35,26 +36,6 @@ jobs:
           if (-not (Test-Path "src\seed_data.json.gz.b64")) { throw "seed data not restored" }
           $app = Get-Content "src\app.py" -Raw
           $app = $app.Replace('e["bonus"] = round(time_points * price, 2)', 'e["bonus"] = round(e["time_points"] * price, 2)')
-          $oldApprove = @'
-        elif action == "approve" and role in ("economist", "admin") and e.get("status") in ("sent", "approved"):
-            missing_special = validate_required_answers(d, e, include_special=True)
-            if missing_special:
-                flash(f"Нельзя утвердить: не заполнены критерии Приложения №25 ({len(missing_special)}).", "error")
-            else:
-                e["status"] = "approved"
-                e["return_comment"] = ""
-                recalc(e)
-                audit(d, f"Анкета рассчитана и утверждена: {e['employee']}")
-'@
-          $newApprove = @'
-        elif action == "approve" and role in ("economist", "admin") and e.get("status") in ("sent", "approved"):
-            e["status"] = "approved"
-            e["return_comment"] = ""
-            recalc(e)
-            audit(d, f"Анкета рассчитана и утверждена: {e['employee']}")
-'@
-          if (-not $app.Contains($oldApprove)) { throw "special criteria approve restriction target not found" }
-          $app = $app.Replace($oldApprove, $newApprove)
           Set-Content -Path "src\app.py" -Value $app -Encoding UTF8
           $lines = Get-Content "src\app.py"
           $out = New-Object System.Collections.Generic.List[string]
@@ -72,9 +53,6 @@ jobs:
           if (Select-String -Path "src\app.py" -SimpleMatch 'Нельзя отправить: не заполнены основные критерии' -Quiet) {
             throw "regular criteria submit restriction still present"
           }
-          if (Select-String -Path "src\app.py" -SimpleMatch 'Нельзя утвердить: не заполнены критерии Приложения №25' -Quiet) {
-            throw "appendix 25 approve restriction still present"
-          }
           $test = Get-Content "src\test_smoke.py" -Raw
           $oldLine = "        rows = gp.report_rows(d, '2026-09')"
           $newLine = "        with gp.app.test_request_context('/'):" + [Environment]::NewLine + "            gp.session['role'] = 'admin'" + [Environment]::NewLine + "            rows = gp.report_rows(d, '2026-09')"
@@ -84,6 +62,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Patch economist appendix 25 restriction
+        run: python patch_appendix25.py
 
       - name: Install dependencies
         working-directory: src
