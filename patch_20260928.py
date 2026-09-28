@@ -153,4 +153,41 @@ if needle not in admin:
 admin = admin.replace(needle, insert, 1)
 admin_path.write_text(admin, encoding="utf-8")
 
+# Adapt smoke test to the new required employee directory and verify manager department override.
+smoke_path = Path("src/test_smoke.py")
+smoke = smoke_path.read_text(encoding="utf-8")
+old = '''        d = gp.load_data()
+        g1 = gp.find_group(d, gp.find_position(d, 1)['group_id'])
+'''
+new = '''        d = gp.load_data()
+        d.setdefault('employees', []).append('Тестовый Работник')
+        gp.save_data(d)
+        d = gp.load_data()
+        g1 = gp.find_group(d, gp.find_position(d, 1)['group_id'])
+'''
+if old not in smoke:
+    raise SystemExit("smoke employee directory insertion target not found")
+smoke = smoke.replace(old, new, 1)
+
+old = """            'funding': 'ОМС',
+            'plan': '182',
+"""
+new = """            'funding': 'ОМС',
+            'department': 'Детское поликлиническое отделение',
+            'plan': '182',
+"""
+if old not in smoke:
+    raise SystemExit("smoke department field target not found")
+smoke = smoke.replace(old, new, 1)
+
+old = "        assert e['department'] == 'Поликлиническое отделение'\n"
+new = """        assert e['department'] == 'Детское поликлиническое отделение'
+        assert c.get(f'/evaluation/{eid}').status_code == 200
+"""
+if old not in smoke:
+    raise SystemExit("smoke department assertion target not found")
+smoke = smoke.replace(old, new, 1)
+
+smoke_path.write_text(smoke, encoding="utf-8")
+
 print("OK: employee directory + manager department override applied")
