@@ -8,6 +8,7 @@ on:
       - "gp27_payload.part*"
       - ".github/workflows/build-windows.yml"
       - "patch_appendix25.py"
+      - "patch_20260928.py"
 
 permissions:
   contents: write
@@ -65,6 +66,9 @@ jobs:
 
       - name: Patch economist appendix 25 restriction
         run: python patch_appendix25.py
+
+      - name: Apply 28 Sep requested changes
+        run: python patch_20260928.py
 
       - name: Install dependencies
         working-directory: src
