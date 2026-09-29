@@ -24,21 +24,17 @@ app = replace_once(
 )
 
 # Live permission lookup. This is deliberately independent of role.
-anchor = '''def find_user(d: dict, user_id):
-    return next((u for u in d["users"] if str(u.get("id")) == str(user_id)), None)
-'''
-if anchor not in app:
-    raise SystemExit("find_user anchor not found")
-app = app.replace(
-    anchor,
-    anchor + '''
-
-def can_edit_special_criteria(d: dict) -> bool:
-    u = find_user(d, session.get("user_id"))
+login_anchor = '@app.route("/login", methods=["GET", "POST"])'
+if login_anchor not in app:
+    raise SystemExit("login route anchor not found")
+helper = '''def can_edit_special_criteria(d: dict) -> bool:
+    user_id = str(session.get("user_id"))
+    u = next((u for u in d.get("users", []) if str(u.get("id")) == user_id), None)
     return bool(u and u.get("special_criteria"))
-''',
-    1,
-)
+
+
+'''
+app = app.replace(login_anchor, helper + login_anchor, 1)
 
 # New evaluation: special criteria may be filled only when the account permission is set.
 app = replace_once(
