@@ -151,19 +151,22 @@ for old, new in patterns:
         tpl = tpl.replace(old, new)
         fio_changed = True
 
-# Fallback for whitespace/newline around the dash, preserving all option attributes.
+# Fallback: variable names can differ in the employee-directory template.
+# Preserve the FIO expression exactly and remove only the visible department part.
 if not fio_changed:
     new_tpl, count = re.subn(
-        r'>\s*\{\{\s*employee\.(fio|name)\s*\}\}\s*[—-]\s*\{\{\s*employee\.department\s*\}\}\s*</option>',
-        lambda m: '>{{ employee.' + m.group(1) + ' }}</option>',
+        r'(>\s*\{\{[^}]+(?:fio|name)[^}]*\}\}\s*)[—–-]\s*\{\{[^}]*department[^}]*\}\}(\s*</option>)',
+        r'\1\2',
         tpl,
+        flags=re.IGNORECASE,
     )
     if count:
         tpl = new_tpl
         fio_changed = True
 
 if not fio_changed:
-    raise SystemExit("employee visible FIO-department option target not found")
+    candidates = [line.strip() for line in tpl.splitlines() if "option" in line.lower() and ("employee" in line.lower() or "department" in line.lower() or "fio" in line.lower())]
+    raise SystemExit("employee visible FIO-department option target not found; candidates=" + " || ".join(candidates[:8]))
 
 # Safety checks: the old role rule must be gone from the special criteria controls.
 if 'allow_special=(role in ("economist", "admin"))' in app:
