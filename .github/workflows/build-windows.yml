@@ -9,6 +9,8 @@ on:
       - ".github/workflows/build-windows.yml"
       - "patch_appendix25.py"
       - "patch_20260928.py"
+      - "employee_seed.part*"
+      - "patch_20260929_codegz.part*"
 
 permissions:
   contents: write
@@ -69,6 +71,14 @@ jobs:
 
       - name: Apply 28 Sep requested changes
         run: python patch_20260928.py
+
+      - name: Apply 29 Sep requested changes
+        shell: pwsh
+        run: |
+          $b64 = (Get-Content "patch_20260929_codegz.part01" -Raw).Trim() + (Get-Content "patch_20260929_codegz.part02" -Raw).Trim()
+          [IO.File]::WriteAllBytes("patch_20260929.py.gz", [Convert]::FromBase64String($b64))
+          python -c "import gzip, pathlib; pathlib.Path('patch_20260929.py').write_bytes(gzip.decompress(pathlib.Path('patch_20260929.py.gz').read_bytes()))"
+          python patch_20260929.py
 
       - name: Install dependencies
         working-directory: src
