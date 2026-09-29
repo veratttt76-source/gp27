@@ -151,6 +151,19 @@ for old, new in patterns:
         tpl = tpl.replace(old, new)
         fio_changed = True
 
+# Current employee directory keeps department as data-department but conditionally
+# appends it to the visible label. Remove only that visible suffix.
+if not fio_changed:
+    new_tpl, count = re.subn(
+        r'(\{\{\s*employee\.name\s*\}\})\s*\{%\s*if\s+employee\.department\s*%\}.*?\{\{\s*employee\.department\s*\}\}.*?\{%\s*endif\s*%\}',
+        r'\1',
+        tpl,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if count:
+        tpl = new_tpl
+        fio_changed = True
+
 # Fallback: variable names can differ in the employee-directory template.
 # Preserve the FIO expression exactly and remove only the visible department part.
 if not fio_changed:
