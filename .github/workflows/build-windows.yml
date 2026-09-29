@@ -11,6 +11,7 @@ on:
       - "patch_20260928.py"
       - "employee_seed.part*"
       - "patch_20260929_codegz.part*"
+      - "patch_20260929_special.py"
 
 permissions:
   contents: write
@@ -79,6 +80,9 @@ jobs:
           [IO.File]::WriteAllBytes("patch_20260929.py.gz", [Convert]::FromBase64String($b64))
           python -c "import gzip, pathlib; pathlib.Path('patch_20260929.py').write_bytes(gzip.decompress(pathlib.Path('patch_20260929.py.gz').read_bytes()))"
           python patch_20260929.py
+
+      - name: Apply only latest 29 Sep correction
+        run: python patch_20260929_special.py
 
       - name: Install dependencies
         working-directory: src
